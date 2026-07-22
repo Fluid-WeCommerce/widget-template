@@ -13,7 +13,7 @@
     "widget:publish": "fluid widget publish"
   },
   "dependencies": {
-    "@fluid-app/portal-sdk": "^0.1.411",
+    "@fluid-app/portal-sdk": "0.1.433",
     "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-query": "^5.90.11",
     "lucide-react": "~0.575.0",
@@ -28,7 +28,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "typescript": "^5.6.0",
     "vite": "^6.4.1",
-    "@fluid-app/fluid-cli-widget": "^0.1.8",
+    "@fluid-app/fluid-cli-widget": "0.1.10",
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3"
@@ -38,6 +38,10 @@
   },
   "packageManager": "pnpm@10.4.1",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "overrides": {
+      "@fluid-app/portal-sdk": "0.1.433",
+      "@fluid-app/fluid-cli-widget": "0.1.10",
+      "@fluid-app/fluid-cli-portal": "0.1.36"
+    }
   }
 }
