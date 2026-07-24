@@ -9,13 +9,13 @@ This repository is a generated Fluid widget package. Treat these instructions as
 - This project contains a widget package only. Do not scaffold droplets, portal apps, Next.js apps, Rails code, API servers, or monorepo packages here.
 - Use React, TypeScript, Vite, and the Fluid widget CLI scripts already in `package.json`.
 - Keep widget source under `src/widgets/` and package metadata in `manifest.ts`.
-- Keep runtime registration in `src/index.ts`. Do not rewrite the global registration protocol unless the Fluid widget CLI changes.
+- Keep the Remote DOM worker entry in `src/index.ts`; it should call `startWidgetPackage()` once.
 - Keep package ownership in `fluid.widget.config.ts`. For droplet-owned widgets, link or set the droplet with `pnpm run widget:link` or `fluid widget link`; do not hard-code a droplet into component source.
-- Runtime CSS belongs in `styles.css` or files imported by modules loaded by the widget builder. Import CSS from `manifest.ts` or the widget component so build artifacts are discovered.
+- Runtime CSS belongs in `styles.css` or files imported by the worker build graph. Keep the guarded CSS import in `src/index.ts` so the builder emits a stylesheet without executing DOM-oriented CSS loading inside the worker.
 
 ## Manifest authoring
 
-Use `defineWidget()` and `defineWidgetPackage()` from `@fluid-app/portal-sdk`.
+Use `defineWidget()`, `defineWidgetPackage()`, and `startWidgetPackage()` from `@fluid-app/portal-sdk/widgets/worker`.
 
 ### `defineWidget()` checklist
 
@@ -27,7 +27,62 @@ Each widget should define:
 - `defaultProps`: JSON-serializable default props. Do not use functions, Dates, undefined values, class instances, NaN, or Infinity.
 - `propertySchema`: JSON-serializable editable fields for the builder property panel.
 - `container`: usually `block` or `card`; use `inline` only for inline content and `fullscreen` only for true full-screen experiences.
+- `uses`: every typed portal function called by this widget. Pass the imported function values; never hand-author capability strings.
 - `resizable`: omit or set false for fixed widgets; otherwise use `true`, `horizontal`, `vertical`, `both`, or an object with horizontal/vertical booleans and optional min sizes.
+
+## Typed portal functions
+
+Import worker-safe portal functions from
+`@fluid-app/portal-sdk/widgets/worker`, call them directly, and declare the
+same function values in `defineWidget({ uses: [...] })`:
+
+```ts
+import {
+  defineWidget,
+  getUserAccount,
+  navigateTo,
+} from "@fluid-app/portal-sdk/widgets/worker";
+
+async function openProfile(): Promise<void> {
+  const account = await getUserAccount();
+  await navigateTo(account.slug);
+}
+
+export const profileButtonWidget = defineWidget({
+  name: "ProfileButton",
+  component: ProfileButton,
+  uses: [getUserAccount, navigateTo],
+});
+```
+
+Available built-ins are `getUserAccount`, `getStore`, `getPortalApp`,
+`getPortalProfile`, `getNavigationState`, `buildPortalHref`, `navigateTo`,
+`getFullscreenState`, `requestFullscreen`, and `exitFullscreen`. Getters return
+resolved data instead of query snapshots. Navigation accepts a slug string,
+`{ slug }`, or `{ href }`.
+
+`uses` is required for every called function. `defineWidget()` converts it to
+the existing descriptor declarations, and both the worker and host enforce the
+declaration. A `PortalFunctionError` with code `NOT_DECLARED` means the called
+function must be added to the widget's `uses` array. Do not write a raw
+`capabilities` array.
+
+`getUserAccount()` may include email, but deliberately excludes phone numbers,
+addresses, payment data, credentials, government or tax identifiers, dates of
+birth, raw metadata, and unknown future fields. Widgets cannot access the
+host's `tenantClient`; use a purpose-built portal function.
+
+Define a company-specific typed function with
+`definePortalFunction<Output, Input>({ capability, version, method })`, call it
+directly, and include it in `uses`. The portal owner implements the same
+function with `implementPortalFunction(function, handler)` under
+`remoteWidgets.functions`. Built-in functions cannot be overridden and
+duplicate custom implementations are rejected.
+
+Custom function inputs and outputs must contain JSON values only: null,
+booleans, finite numbers, strings, arrays, and objects composed from those
+values. Do not use `undefined`, functions, Dates, Maps, Sets, class instances,
+`NaN`, or `Infinity`; the runtime validates both requests and responses.
 
 ### `defineWidgetPackage()` checklist
 
@@ -36,7 +91,7 @@ The generated package is droplet-owned:
 - `scope` is the namespace passed at project creation.
 - `packageType` must stay `droplet`.
 - `version` must be SemVer without build metadata, such as `1.2.3` or `1.2.3-beta.1`.
-- `remoteEntryUrl` should stay `widget.js` for the standalone publish flow.
+- Do not author `workerEntryUrl`; dev and build inject the served worker artifact URL.
 - `widgets` must contain at least one `defineWidget()` result.
 - Do not manually set `packageStableId` for the default droplet template. The CLI injects the linked droplet as the stable package key during validation, build, and publish.
 
@@ -144,21 +199,22 @@ Fluid hosts provide semantic CSS variables. Prefer those over hard-coded colors:
 - Radius: `--radius`, `--radius-sm`, `--radius-md`, `--radius-lg`, `--radius-xl`.
 - Theme engine aliases may also provide `--font-header`, `--font-body`, `--font-size-extra-small`, `--font-size-small`, `--font-size-regular`, `--font-size-large`, `--font-size-extra-large`, and `--font-size-giant`.
 
-Tailwind equivalents, when Tailwind is available in a host or preview, are the semantic utilities: `bg-background`, `text-foreground`, `bg-card`, `text-card-foreground`, `bg-primary`, `text-primary-foreground`, `border-border`, `ring-ring`, `rounded-lg`, and text sizes such as `text-sm` or `text-xl`. In this standalone template, plain CSS is the safest runtime default.
+Tailwind equivalents, when Tailwind is available in a host, are the semantic utilities: `bg-background`, `text-foreground`, `bg-card`, `text-card-foreground`, `bg-primary`, `text-primary-foreground`, `border-border`, `ring-ring`, `rounded-lg`, and text sizes such as `text-sm` or `text-xl`. In this standalone template, plain CSS is the safest runtime default.
 
 Light/dark behavior:
 
 - The portal switches theme values with `data-theme-mode="dark"` and may also honor system dark mode when configured.
 - Do not write separate hard-coded dark palettes unless absolutely necessary. Use semantic variables so the host theme controls both modes.
 - If you need mode-specific refinements, scope them to `[data-theme-mode="dark"]` and keep them token-based.
-- Avoid styling that only works on white backgrounds. Test in the local builder preview dark toggle and with high-contrast colors.
+- Avoid styling that only works on white backgrounds. Use semantic variables and verify against representative light, dark, and high-contrast host token values.
 
 Runtime CSS rules:
 
 - Put runtime selectors in `styles.css` or imported CSS modules.
 - Keep selectors prefixed with the widget name to avoid leaking styles into the host.
-- Do not rely on global body styles for runtime appearance; body styles are only for local preview.
-- Ensure CSS is imported by `manifest.ts` or another module included in the widget build, otherwise CSS artifacts may not be published.
+- Do not rely on global body styles for runtime appearance.
+- Ensure CSS is reachable from the guarded import in `src/index.ts` or another module included in the widget build, otherwise CSS artifacts may not be published.
+- Test through a portal or builder host using the generated Remote DOM endpoints. Do not add a direct React host preview for third-party widgets.
 
 ## Validation workflow
 
@@ -170,7 +226,7 @@ pnpm validate
 pnpm build
 ```
 
-Use `pnpm dev` for local preview and `pnpm run widget:publish -- --dry-run` when checking publish readiness without uploading.
+Use `pnpm dev` for local descriptor and worker endpoints, and `pnpm run widget:publish --dry-run` when checking publish readiness without uploading.
 
 Common failures and fixes:
 
@@ -181,5 +237,5 @@ Common failures and fixes:
 - Invalid version: use SemVer without build metadata.
 - Non-serializable metadata: remove functions, undefined values, Dates, NaN, Infinity, Maps, Sets, and class instances from `propertySchema` and `defaultProps`.
 - CSS URL mismatch: import runtime CSS into the bundle or remove manual `cssUrls` entries.
-- Build succeeds but styles are missing: confirm the CSS import is reachable from `manifest.ts` or the widget component.
-- Preview works but published widget fails: check that browser-only APIs are guarded and no local-only URLs or environment variables are required at runtime.
+- Build succeeds but styles are missing: confirm the CSS import is reachable from `src/index.ts` or the widget component.
+- Local development works but the published widget fails: check that browser-only APIs are guarded and no local-only URLs or environment variables are required at runtime.
