@@ -1,5 +1,7 @@
-import { defineWidget, defineWidgetPackage } from "@fluid-app/portal-sdk";
-import "./styles.css";
+import {
+  defineWidget,
+  defineWidgetPackage,
+} from "@fluid-app/portal-sdk/widgets/worker";
 import { ReviewCarousel } from "./src/widgets/review-carousel/ReviewCarousel";
 
 export const reviewCarouselWidget = defineWidget({
@@ -63,7 +65,6 @@ export const widgetPackage = defineWidgetPackage({
   scope: "droplet",
   version: "0.1.0",
   packageType: "droplet",
-  remoteEntryUrl: "widget.js",
   widgets: [reviewCarouselWidget],
 });
 
