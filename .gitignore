@@ -5,3 +5,9 @@ dist
 .env.local
 .fluid
 *.tsbuildinfo
+
+# Local tooling state — never belongs in the widget repo.
+# .mist-desktop/ holds Mist Desktop's private chats, attachments, and
+# screenshots for this project; .mist is its clone/slug marker.
+.mist
+.mist-desktop/
