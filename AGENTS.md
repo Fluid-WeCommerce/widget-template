@@ -210,6 +210,21 @@ Light/dark behavior:
 
 Runtime CSS rules:
 
+**A stylesheet is the only way to style a widget. Inline styles do not work.**
+
+The host sanitizes every Remote DOM mutation before it reaches the shadow root. The
+`style` attribute is rejected and `<style>` elements are a banned tag, so:
+
+- `style={{ color: "red" }}` on any element is **silently dropped**. The element renders
+  with no styling and no error — this is the single most common reason a widget "looks
+  broken" or "came out unstyled".
+- An inline `<style>` block never renders.
+- Only CSS reachable from the widget build graph is published as a `cssUrls` artifact and
+  adopted into the shadow root.
+
+So: put every rule in a stylesheet, give elements `className`s, and target those classes.
+Never reach for an inline style — it will not survive.
+
 - Put runtime selectors in `styles.css` or imported CSS modules.
 - Keep selectors prefixed with the widget name to avoid leaking styles into the host.
 - Do not rely on global body styles for runtime appearance.
