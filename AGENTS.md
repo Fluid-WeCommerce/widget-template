@@ -67,6 +67,30 @@ declaration. A `PortalFunctionError` with code `NOT_DECLARED` means the called
 function must be added to the widget's `uses` array. Do not write a raw
 `capabilities` array.
 
+For public third-party HTTP APIs, import the declarative `networkAccess`
+marker and include it in `uses`. The builder asks the portal author for
+consent before adding the widget:
+
+```ts
+import {
+  defineWidget,
+  networkAccess,
+} from "@fluid-app/portal-sdk/widgets/worker";
+
+export const weatherWidget = defineWidget({
+  name: "Weather",
+  component: Weather,
+  uses: [networkAccess],
+});
+```
+
+The worker then uses standard `fetch` directly. Fluid does not add tokens,
+cookies, credentials, or headers. Direct requests to `fluid.app`, the current
+portal origin, loopback, and private-network addresses are blocked. Redirects
+are handled by native fetch and are not inspected, so network approval remains
+a package-trust decision. WebSocket, EventSource, WebTransport, and
+streaming-specific APIs are not part of this capability.
+
 `getUserAccount()` may include email, but deliberately excludes phone numbers,
 addresses, payment data, credentials, government or tax identifiers, dates of
 birth, raw metadata, and unknown future fields. Widgets cannot access the
