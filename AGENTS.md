@@ -24,7 +24,9 @@ Read the linked reference for the task before editing source or metadata.
 - Preserve existing work. Inspect `git status` before commands that can change
   files.
 - Keep package and widget identifiers stable after publication. Published
-  versions are immutable; increase `version` for each release.
+  versions are immutable; increase `version` for each release. If a publish
+  fails with `Package version already exists`, increase the patch version in
+  `manifest.ts` and rerun it — an authorized publish authorizes this bump.
 - Treat all props and portal-function results as partial or malformed JSON.
   Render an empty or error state instead of throwing during render.
 - Declare every portal function and capability used by a widget in `uses`.
